@@ -14,6 +14,7 @@ import com.example.model.Movie
 import com.example.retrofit.databinding.ActivityMainBinding
 
 import dmax.dialog.SpotsDialog
+import kotlinx.coroutines.*
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -23,7 +24,6 @@ class MainActivity : AppCompatActivity() {
     lateinit var mService: RetrofitServices
     lateinit var layoutManager: LinearLayoutManager
     lateinit var adapter: MyMovieAdapter
-    lateinit var dialog: AlertDialog
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,23 +34,28 @@ class MainActivity : AppCompatActivity() {
         binding.recyclerMovieList.setHasFixedSize(true)
         layoutManager = LinearLayoutManager(this)
         binding.recyclerMovieList.layoutManager = layoutManager
-        dialog = SpotsDialog.Builder().setCancelable(true).setContext(this).build()
-        getAllMovieList()
+        scope()
     }
+    private fun scope() = runBlocking {
+        getAllMovieListCorutine()
 
-    private fun getAllMovieList() {
-        dialog.show()
-        mService.getMovieList().enqueue(object : Callback<MutableList<Movie>> {
-            override fun onFailure(call: Call<MutableList<Movie>>, t: Throwable) {
-            Log.i("Fail","Failure getting movie list")
+    }
+    suspend fun getAllMovieListCorutine() = coroutineScope {
+            launch {
+                mService.getMovieList().enqueue(object : Callback<MutableList<Movie>> {
+                    override fun onFailure(call: Call<MutableList<Movie>>, t: Throwable) {
+                        Log.i("Fail", "Failure getting movie list")
+                    }
+                    @SuppressLint("NotifyDataSetChanged")
+                    override fun onResponse(
+                        call: Call<MutableList<Movie>>,
+                        response: Response<MutableList<Movie>>
+                    ) {
+                        adapter = MyMovieAdapter(baseContext, response.body() as MutableList<Movie>)
+                        adapter.notifyDataSetChanged()
+                        binding.recyclerMovieList.adapter = adapter
+                    }
+                })
             }
-            @SuppressLint("NotifyDataSetChanged")
-            override fun onResponse(call: Call<MutableList<Movie>>, response: Response<MutableList<Movie>>) {
-                adapter = MyMovieAdapter(baseContext, response.body() as MutableList<Movie>)
-                adapter.notifyDataSetChanged()
-                binding.recyclerMovieList.adapter = adapter
-                dialog.dismiss()
-            }
-        })
     }
 }
